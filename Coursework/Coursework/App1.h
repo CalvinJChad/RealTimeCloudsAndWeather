@@ -6,7 +6,9 @@
 #include "DXF.h"
 // Shaders
 #include "TextureShader.h"
+#include "WorleyComputeShader.h"
 
+using namespace std;
 
 class App1 : public BaseApplication
 {
@@ -22,13 +24,21 @@ protected:
 	bool render();
 	void gui();
 
+	// Pipeline stages
+	void firstPass();	/* Currently empty */
+	void computePass();	/* Compute worley noise*/
+	void finalPass();	/* Render the scene */
+
 private:
 	// Shaders
-	TextureShader* textureShader;
+	unique_ptr<TextureShader> textureShader;
+	unique_ptr<WorleyComputeShader> worleyComputeShader;
 
 	// Meshes
-	PlaneMesh* planeMesh;
+	unique_ptr<PlaneMesh> planeMesh;
 
+	// Cloud Generation
+	const int numCellsPerAxis = 128;
 };
 
 #endif

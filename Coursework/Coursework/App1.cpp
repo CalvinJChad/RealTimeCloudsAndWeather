@@ -18,10 +18,11 @@ void App1::init(HINSTANCE hinstance, HWND hwnd, int screenWidth, int screenHeigh
 	textureMgr->loadTexture(L"brick", L"res/brick1.dds");
 	
 	// Initialise shaders
-	textureShader = new TextureShader(renderer->getDevice(), hwnd);
+	textureShader = make_unique<TextureShader>(renderer->getDevice(), hwnd);
+	worleyComputeShader = make_unique<WorleyComputeShader>(renderer->getDevice(), hwnd, numCellsPerAxis, numCellsPerAxis, numCellsPerAxis);
 
 	// Initialise meshes
-	planeMesh = new PlaneMesh(renderer->getDevice(), renderer->getDeviceContext());
+	planeMesh = make_unique<PlaneMesh>(renderer->getDevice(), renderer->getDeviceContext());
 
 }
 
@@ -58,6 +59,42 @@ bool App1::frame()
 
 bool App1::render()
 {
+	firstPass();
+	computePass();
+	finalPass();
+
+	return true;
+}
+
+void App1::gui()
+{
+	// Force turn off unnecessary shader stages.
+	renderer->getDeviceContext()->GSSetShader(NULL, NULL, 0);
+	renderer->getDeviceContext()->HSSetShader(NULL, NULL, 0);
+	renderer->getDeviceContext()->DSSetShader(NULL, NULL, 0);
+
+	// Build UI
+	ImGui::Text("FPS: %.2f", timer->getFPS());
+	ImGui::Checkbox("Wireframe mode", &wireframeToggle);
+
+	// Render UI
+	ImGui::Render();
+	ImGui_ImplDX11_RenderDrawData(ImGui::GetDrawData());
+}
+
+void App1::firstPass()
+{
+}
+
+void App1::computePass()
+{
+	worleyComputeShader->setShaderParameters(renderer->getDeviceContext());
+	worleyComputeShader->compute(renderer->getDeviceContext(), numCellsPerAxis / Num_Threads_Per_Group.x, numCellsPerAxis / Num_Threads_Per_Group.y, numCellsPerAxis / Num_Threads_Per_Group.z);
+	worleyComputeShader->unbind(renderer->getDeviceContext());
+}
+
+void App1::finalPass()
+{
 	// Clear the scene. (default blue colour)
 	renderer->beginScene(0.39f, 0.58f, 0.92f, 1.0f);
 
@@ -77,30 +114,12 @@ bool App1::render()
 		textureShader->setShaderParameters(renderer->getDeviceContext(), worldMatrix, viewMatrix, projectionMatrix, textureMgr->getTexture(L"brick"));
 		textureShader->render(renderer->getDeviceContext(), planeMesh->getIndexCount());
 	}
-	
+
 
 	// Render GUI
 	gui();
 
 	// Present the rendered scene to the screen.
 	renderer->endScene();
-
-	return true;
-}
-
-void App1::gui()
-{
-	// Force turn off unnecessary shader stages.
-	renderer->getDeviceContext()->GSSetShader(NULL, NULL, 0);
-	renderer->getDeviceContext()->HSSetShader(NULL, NULL, 0);
-	renderer->getDeviceContext()->DSSetShader(NULL, NULL, 0);
-
-	// Build UI
-	ImGui::Text("FPS: %.2f", timer->getFPS());
-	ImGui::Checkbox("Wireframe mode", &wireframeToggle);
-
-	// Render UI
-	ImGui::Render();
-	ImGui_ImplDX11_RenderDrawData(ImGui::GetDrawData());
 }
 
