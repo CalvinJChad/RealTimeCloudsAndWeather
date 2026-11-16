@@ -169,12 +169,14 @@
   <ItemGroup>
     <ClCompile Include="App1.cpp" />
     <ClCompile Include="Main.cpp" />
+    <ClCompile Include="PerlinWorleyComputeShader.cpp" />
     <ClCompile Include="TextureShader.cpp" />
     <ClCompile Include="ViewWorleySliceShader.cpp" />
     <ClCompile Include="WorleyComputeShader.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="App1.h" />
+    <ClInclude Include="PerlinWorleyComputeShader.h" />
     <ClInclude Include="TextureShader.h" />
     <ClInclude Include="ViewWorleySliceShader.h" />
     <ClInclude Include="WorleyComputeShader.h" />

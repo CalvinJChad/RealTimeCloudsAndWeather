@@ -34,5 +34,3 @@ private:
 	int sDepth;
 };
 
-static const XMINT3 Num_Threads_Per_Group = XMINT3(8, 8, 8);	// Make sure this is up-to-date with cs number of threads defenition.
-

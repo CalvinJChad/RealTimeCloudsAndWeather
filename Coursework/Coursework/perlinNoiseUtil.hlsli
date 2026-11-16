@@ -13,7 +13,7 @@
 // From GLM (gtc/noise.hpp & detail/_noise.hpp)
 float4 mod289(float4 x)
 {
-    return x - floor(x * (float4) 1.0f / (float4) 289.0f * (float4) 289.0f);
+    return x - floor(x * (1.0f / 289.0f)) * 289.0f;
 }
 
 float4 permute(float4 x)
@@ -187,8 +187,7 @@ float perlinNoise3D(float3 pIn, float frequency, int octaveCount)
         frequency *= octaveFrenquencyFactor;
     }
 
-    float noise = (sum / weightSum); // *0.5 + 0.5;;
-    noise = min(noise, 1.0f);
-    noise = max(noise, 0.0f);
+    float noise = (sum / weightSum) * 0.5f + 0.5f;
+    noise = saturate(noise);
     return noise;
 }

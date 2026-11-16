@@ -7,6 +7,7 @@
 // Shaders
 #include "TextureShader.h"
 #include "WorleyComputeShader.h"
+#include "PerlinWorleyComputeShader.h"
 #include "ViewWorleySliceShader.h"
 
 using namespace std;
@@ -36,6 +37,7 @@ private:
 	// Shaders
 	unique_ptr<TextureShader> textureShader;
 	unique_ptr<WorleyComputeShader> worleyComputeShader;
+	unique_ptr<PerlinWorleyComputeShader> perlinWorleyComputeShader;
 	unique_ptr<ViewWorleySliceShader> viewWorleySliceShader;
 
 	// Meshes
@@ -58,5 +60,7 @@ private:
 	Active_Channel_Type activeChannel = ACTIVE_CHANNEL_R;
 	const char* channelNames[4] = { "R", "G", "B", "A" };	// Channel names used by ImGui Combo Box.
 };
+
+static const XMINT3 Num_Threads_Per_Group = XMINT3(8, 8, 8);	// Make sure this is up-to-date with cs number of threads defenition.
 
 #endif

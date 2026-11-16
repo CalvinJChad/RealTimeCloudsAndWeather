@@ -20,6 +20,7 @@ void App1::init(HINSTANCE hinstance, HWND hwnd, int screenWidth, int screenHeigh
 	// Initialise shaders
 	textureShader = make_unique<TextureShader>(renderer->getDevice(), hwnd);
 	worleyComputeShader = make_unique<WorleyComputeShader>(renderer->getDevice(), hwnd, numCellsPerAxis, numCellsPerAxis, numCellsPerAxis);
+	perlinWorleyComputeShader = make_unique<PerlinWorleyComputeShader>(renderer->getDevice(), hwnd, numCellsPerAxis, numCellsPerAxis, numCellsPerAxis);
 	viewWorleySliceShader = make_unique<ViewWorleySliceShader>(renderer->getDevice(), hwnd);
 
 	// Initialise meshes
@@ -93,9 +94,13 @@ void App1::firstPass()
 
 void App1::computePass()
 {
-	worleyComputeShader->setShaderParameters(renderer->getDeviceContext());
+	/*worleyComputeShader->setShaderParameters(renderer->getDeviceContext());
 	worleyComputeShader->compute(renderer->getDeviceContext(), numCellsPerAxis / Num_Threads_Per_Group.x, numCellsPerAxis / Num_Threads_Per_Group.y, numCellsPerAxis / Num_Threads_Per_Group.z);
-	worleyComputeShader->unbind(renderer->getDeviceContext());
+	worleyComputeShader->unbind(renderer->getDeviceContext());*/
+
+	perlinWorleyComputeShader->setShaderParameters(renderer->getDeviceContext());
+	perlinWorleyComputeShader->compute(renderer->getDeviceContext(), numCellsPerAxis / Num_Threads_Per_Group.x, numCellsPerAxis / Num_Threads_Per_Group.y, numCellsPerAxis / Num_Threads_Per_Group.z);
+	perlinWorleyComputeShader->unbind(renderer->getDeviceContext());
 }
 
 void App1::finalScenePass()
@@ -135,7 +140,7 @@ void App1::worleySlicePass()
 	renderer->setZBuffer(false);
 	orthoMesh->sendData(renderer->getDeviceContext());
 
-	viewWorleySliceShader->setShaderParameters(renderer->getDeviceContext(), worldMatrix, baseViewMatrix, orthoMatrix, worleyComputeShader->getSRV(), viewerGreyscale, viewerShowAllChannels, viewerSliceDepth, activeChannel);
+	viewWorleySliceShader->setShaderParameters(renderer->getDeviceContext(), worldMatrix, baseViewMatrix, orthoMatrix, perlinWorleyComputeShader->getSRV(), viewerGreyscale, viewerShowAllChannels, viewerSliceDepth, activeChannel);
 	viewWorleySliceShader->render(renderer->getDeviceContext(), orthoMesh->getIndexCount());
 
 	renderer->setZBuffer(true);

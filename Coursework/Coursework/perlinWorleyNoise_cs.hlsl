@@ -21,7 +21,7 @@
 
 RWTexture3D<float4> gOutput : register(u0);
 
-uniform float frequenceMul[6u] = { 2.0, 8.0, 14.0, 20.0, 26.0, 32.0 };
+static const float frequenceMul[6u] = { 2.0, 8.0, 14.0, 20.0, 26.0, 32.0 };
 
 // ======================================================================
 
@@ -30,9 +30,9 @@ float remap(float originalValue, float originalMin, float originalMax, float new
     return newMin + (((originalValue - originalMin) / (originalMax - originalMin)) * (newMax - newMin));
 }
 
-float4 stackable3DNoise(uint3 pixel)
+float4 stackable3DNoise(uint3 pixel, uint w, uint h, uint d)
 {
-    float3 coord = float3(float(pixel.x) / 128.0, float(pixel.y) / 128.0, float(pixel.z) / 128.0);
+    float3 coord = float3(float(pixel.x) / w, float(pixel.y) / h, float(pixel.z) / d);
 
 	// Perlin FBM noise
     int octaveCount = 3;
@@ -87,5 +87,5 @@ void main(uint3 dispatchThreadID : SV_DispatchThreadID)
     
     //int3 pixel = dispatchThreadID.xyz;
     
-    gOutput[dispatchThreadID] = stackable3DNoise(dispatchThreadID);
+    gOutput[dispatchThreadID] = stackable3DNoise(dispatchThreadID, width, height, depth);
 }
