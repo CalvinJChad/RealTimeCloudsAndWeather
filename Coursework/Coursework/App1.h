@@ -55,6 +55,8 @@ private:
 	bool viewerGreyscale = true;
 	bool viewerShowAllChannels = false;
 	float viewerSliceDepth = 0.0f;
+	Active_Channel_Type activeChannel = ACTIVE_CHANNEL_R;
+	const char* channelNames[4] = { "R", "G", "B", "A" };	// Channel names used by ImGui Combo Box.
 };
 
 #endif

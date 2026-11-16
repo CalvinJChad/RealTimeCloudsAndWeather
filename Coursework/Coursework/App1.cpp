@@ -135,7 +135,7 @@ void App1::worleySlicePass()
 	renderer->setZBuffer(false);
 	orthoMesh->sendData(renderer->getDeviceContext());
 
-	viewWorleySliceShader->setShaderParameters(renderer->getDeviceContext(), worldMatrix, baseViewMatrix, orthoMatrix, worleyComputeShader->getSRV(), viewerGreyscale, viewerShowAllChannels, viewerSliceDepth);
+	viewWorleySliceShader->setShaderParameters(renderer->getDeviceContext(), worldMatrix, baseViewMatrix, orthoMatrix, worleyComputeShader->getSRV(), viewerGreyscale, viewerShowAllChannels, viewerSliceDepth, activeChannel);
 	viewWorleySliceShader->render(renderer->getDeviceContext(), orthoMesh->getIndexCount());
 
 	renderer->setZBuffer(true);
@@ -185,6 +185,24 @@ void App1::gui()
 
 	if (ImGui::CollapsingHeader("Debug Worley Noise"))
 	{
+		// Select active channel.
+		const char* previewValue = channelNames[static_cast<int>(activeChannel)];
+		if (ImGui::BeginCombo("Render Mode", previewValue)) {
+			for (int i = 0; i < IM_ARRAYSIZE(channelNames); i++) {
+				const bool isSelected = (static_cast<int>(activeChannel) == i);
+
+				if (ImGui::Selectable(channelNames[i], isSelected)) {
+					activeChannel = static_cast<Active_Channel_Type>(i);
+				}
+
+				// Set the initial focus when opening the combo (scrolling + keyboard navigation)
+				if (isSelected) {
+					ImGui::SetItemDefaultFocus();
+				}
+			}
+			ImGui::EndCombo();
+		}
+
 		ImGui::Checkbox("Viewer Greyscale", &viewerGreyscale);
 		ImGui::Checkbox("Viewer Show All Channels", &viewerShowAllChannels);
 		ImGui::DragFloat("Viewer Slice Depth", &viewerSliceDepth, 0.01f, 0.0f, 1.0f);

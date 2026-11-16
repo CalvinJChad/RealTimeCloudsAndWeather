@@ -87,7 +87,7 @@ void ViewWorleySliceShader::initShader(const wchar_t* vsFilename, const wchar_t*
 
 }
 
-void ViewWorleySliceShader::setShaderParameters(ID3D11DeviceContext* deviceContext, const XMMATRIX& worldMatrix, const XMMATRIX& viewMatrix, const XMMATRIX& projectionMatrix, ID3D11ShaderResourceView* texture, bool viewerGreyscale, bool viewerShowAllChannels, float viewerSliceDepth)
+void ViewWorleySliceShader::setShaderParameters(ID3D11DeviceContext* deviceContext, const XMMATRIX& worldMatrix, const XMMATRIX& viewMatrix, const XMMATRIX& projectionMatrix, ID3D11ShaderResourceView* texture, bool viewerGreyscale, bool viewerShowAllChannels, float viewerSliceDepth, Active_Channel_Type activeChannelType)
 {
 	HRESULT result;
 	D3D11_MAPPED_SUBRESOURCE mappedResource;
@@ -118,7 +118,7 @@ void ViewWorleySliceShader::setShaderParameters(ID3D11DeviceContext* deviceConte
 		viewDataPtr->enableGreyscale = viewerGreyscale;
 		viewDataPtr->enableShowAllChannels = viewerShowAllChannels;
 		viewDataPtr->sliceDepth = viewerSliceDepth;
-		viewDataPtr->padding = 0.f;
+		viewDataPtr->activeChannelType = activeChannelType;
 		deviceContext->Unmap(viewWorleySliceBuffer, 0);
 		deviceContext->PSSetConstantBuffers(0, 1, &viewWorleySliceBuffer);
 	}
