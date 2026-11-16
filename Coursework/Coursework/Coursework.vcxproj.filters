@@ -27,6 +27,9 @@
     <ClCompile Include="WorleyComputeShader.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
+    <ClCompile Include="ViewWorleySliceShader.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="App1.h">
@@ -38,6 +41,9 @@
     <ClInclude Include="WorleyComputeShader.h">
       <Filter>Header Files</Filter>
     </ClInclude>
+    <ClInclude Include="ViewWorleySliceShader.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <FxCompile Include="texture_ps.hlsl">
@@ -47,6 +53,9 @@
       <Filter>Resource Files</Filter>
     </FxCompile>
     <FxCompile Include="worleyNoise_cs.hlsl">
+      <Filter>Resource Files</Filter>
+    </FxCompile>
+    <FxCompile Include="viewWorleySlice_ps.hlsl">
       <Filter>Resource Files</Filter>
     </FxCompile>
   </ItemGroup>

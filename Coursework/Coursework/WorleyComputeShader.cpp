@@ -36,6 +36,9 @@ WorleyComputeShader::~WorleyComputeShader()
 		m_srvTexOutput->Release();
 		m_srvTexOutput = 0;
 	}
+
+	//Release base shader components
+	BaseShader::~BaseShader();
 }
 
 void WorleyComputeShader::initShader(const wchar_t* cfile, const wchar_t* blank)

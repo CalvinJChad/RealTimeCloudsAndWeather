@@ -4,7 +4,7 @@
 
 App1::App1()
 {
-
+	
 }
 
 void App1::init(HINSTANCE hinstance, HWND hwnd, int screenWidth, int screenHeight, Input *in, bool VSYNC, bool FULL_SCREEN)
@@ -20,10 +20,14 @@ void App1::init(HINSTANCE hinstance, HWND hwnd, int screenWidth, int screenHeigh
 	// Initialise shaders
 	textureShader = make_unique<TextureShader>(renderer->getDevice(), hwnd);
 	worleyComputeShader = make_unique<WorleyComputeShader>(renderer->getDevice(), hwnd, numCellsPerAxis, numCellsPerAxis, numCellsPerAxis);
+	viewWorleySliceShader = make_unique<ViewWorleySliceShader>(renderer->getDevice(), hwnd);
 
 	// Initialise meshes
 	planeMesh = make_unique<PlaneMesh>(renderer->getDevice(), renderer->getDeviceContext());
+	orthoMesh = make_unique<OrthoMesh>(renderer->getDevice(), renderer->getDeviceContext(), screenWidth, screenHeight);	// Assuming I need to make the ortho mesh the same size as the camera.
 
+	// Initialise RT objects. One needed to store the worley slice view.
+	worleySliceViewRT = make_unique<RenderTexture>(renderer->getDevice(), numCellsPerAxis, numCellsPerAxis, 0.1f, 100.f);	// Assuming I make the render texture the same size as the Worley noise texture.
 }
 
 
@@ -46,6 +50,12 @@ bool App1::frame()
 	{
 		return false;
 	}
+
+	// Make sure ImGui values are properly clamped.
+	{
+		// Quote from my cmp301 cw source code: 'CAN'T USE STD CLAMP YAAAAAAAAAAAAAAY!'
+		viewerSliceDepth = clamp(viewerSliceDepth, 0.0f, 1.0f);
+	}
 	
 	// Render the graphics.
 	result = render();
@@ -59,27 +69,22 @@ bool App1::frame()
 
 bool App1::render()
 {
+	// Generate the view matrix based on the camera's position.
+	camera->update();
+
 	firstPass();
-	computePass();
-	finalPass();
+	computePass();	// Compute Worley noise.
+	//finalScenePass();
+	worleySlicePass();
+	finalPass(worleySliceViewRT.get());
+
+	// Render GUI
+	gui();
+
+	// Present the rendered scene to the screen.
+	renderer->endScene();
 
 	return true;
-}
-
-void App1::gui()
-{
-	// Force turn off unnecessary shader stages.
-	renderer->getDeviceContext()->GSSetShader(NULL, NULL, 0);
-	renderer->getDeviceContext()->HSSetShader(NULL, NULL, 0);
-	renderer->getDeviceContext()->DSSetShader(NULL, NULL, 0);
-
-	// Build UI
-	ImGui::Text("FPS: %.2f", timer->getFPS());
-	ImGui::Checkbox("Wireframe mode", &wireframeToggle);
-
-	// Render UI
-	ImGui::Render();
-	ImGui_ImplDX11_RenderDrawData(ImGui::GetDrawData());
 }
 
 void App1::firstPass()
@@ -93,13 +98,10 @@ void App1::computePass()
 	worleyComputeShader->unbind(renderer->getDeviceContext());
 }
 
-void App1::finalPass()
+void App1::finalScenePass()
 {
 	// Clear the scene. (default blue colour)
-	renderer->beginScene(0.39f, 0.58f, 0.92f, 1.0f);
-
-	// Generate the view matrix based on the camera's position.
-	camera->update();
+	renderer->beginScene(backgroundColour.x, backgroundColour.y, backgroundColour.z, backgroundColour.w);
 
 	// Get the world, view, projection, and ortho matrices from the camera and Direct3D objects.
 	XMMATRIX worldMatrix = renderer->getWorldMatrix();
@@ -115,11 +117,81 @@ void App1::finalPass()
 		textureShader->render(renderer->getDeviceContext(), planeMesh->getIndexCount());
 	}
 
+}
 
-	// Render GUI
-	gui();
+void App1::worleySlicePass()
+{
+	//if (!worleyComputeShader || worleyComputeShader->getSRV()) return;
 
-	// Present the rendered scene to the screen.
-	renderer->endScene();
+	// Rendering to the Worley slice texture.
+	worleySliceViewRT->setRenderTarget(renderer->getDeviceContext());
+	worleySliceViewRT->clearRenderTarget(renderer->getDeviceContext(), backgroundColour.x, backgroundColour.y, backgroundColour.z, backgroundColour.w);
+
+	// Get the world, view, projection, and ortho matrices from the camera and Direct3D objects.
+	XMMATRIX worldMatrix = renderer->getWorldMatrix();
+	XMMATRIX orthoMatrix = renderer->getOrthoMatrix();	// ortho matrix for 2D rendering
+	XMMATRIX baseViewMatrix = camera->getOrthoViewMatrix();
+
+	renderer->setZBuffer(false);
+	orthoMesh->sendData(renderer->getDeviceContext());
+
+	viewWorleySliceShader->setShaderParameters(renderer->getDeviceContext(), worldMatrix, baseViewMatrix, orthoMatrix, worleyComputeShader->getSRV(), viewerGreyscale, viewerShowAllChannels, viewerSliceDepth);
+	viewWorleySliceShader->render(renderer->getDeviceContext(), orthoMesh->getIndexCount());
+
+	renderer->setZBuffer(true);
+
+	// Set back buffer as render target and reset view port.
+	renderer->setBackBufferRenderTarget();
+	renderer->resetViewport();
+}
+
+void App1::finalPass(RenderTexture* finalRT)
+{
+	// If passed in render texture is invalid, render the final scene instead.
+	if (!finalRT || !finalRT->getShaderResourceView())
+	{
+		// Doesn't really work cause the SRV will always be valid if the RT is valid.
+		finalScenePass();
+		return;
+	}
+
+	// Render passed in render texture onto an ortho mesh.
+	renderer->beginScene(backgroundColour.x, backgroundColour.y, backgroundColour.z, backgroundColour.w);	// Clear the scene. (default blue colour)
+
+	// Get the world, view, projection, and ortho matrices from the camera and Direct3D objects.
+	XMMATRIX worldMatrix = renderer->getWorldMatrix();
+	XMMATRIX orthoMatrix = renderer->getOrthoMatrix();// ortho matrix for 2D rendering
+	XMMATRIX baseViewMatrix = camera->getOrthoViewMatrix();
+
+	renderer->setZBuffer(false);
+	orthoMesh->sendData(renderer->getDeviceContext());
+
+	textureShader->setShaderParameters(renderer->getDeviceContext(), worldMatrix, baseViewMatrix, orthoMatrix, finalRT->getShaderResourceView());
+	textureShader->render(renderer->getDeviceContext(), orthoMesh->getIndexCount());
+
+	renderer->setZBuffer(true);
+}
+
+void App1::gui()
+{
+	// Force turn off unnecessary shader stages.
+	renderer->getDeviceContext()->GSSetShader(NULL, NULL, 0);
+	renderer->getDeviceContext()->HSSetShader(NULL, NULL, 0);
+	renderer->getDeviceContext()->DSSetShader(NULL, NULL, 0);
+
+	// Build UI
+	ImGui::Text("FPS: %.2f", timer->getFPS());
+	ImGui::Checkbox("Wireframe mode", &wireframeToggle);
+
+	if (ImGui::CollapsingHeader("Debug Worley Noise"))
+	{
+		ImGui::Checkbox("Viewer Greyscale", &viewerGreyscale);
+		ImGui::Checkbox("Viewer Show All Channels", &viewerShowAllChannels);
+		ImGui::DragFloat("Viewer Slice Depth", &viewerSliceDepth, 0.01f, 0.0f, 1.0f);
+	}
+
+	// Render UI
+	ImGui::Render();
+	ImGui_ImplDX11_RenderDrawData(ImGui::GetDrawData());
 }
 
