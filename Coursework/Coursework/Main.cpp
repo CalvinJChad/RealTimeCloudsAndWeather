@@ -8,7 +8,7 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, PSTR pScmdline,
 	System* system;
 
 	// Create the system object.
-	system = new System(app, 1280, 1280, true, false);
+	system = new System(app, 960, 960, true, false);
 
 	// Initialize and run the system object.
 	system->run();

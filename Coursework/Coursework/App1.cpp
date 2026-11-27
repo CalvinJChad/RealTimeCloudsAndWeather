@@ -55,7 +55,9 @@ bool App1::frame()
 	// Make sure ImGui values are properly clamped.
 	{
 		// Quote from my cmp301 cw source code: 'CAN'T USE STD CLAMP YAAAAAAAAAAAAAAY!'
-		viewerSliceDepth = clamp(viewerSliceDepth, 0.0f, 1.0f);
+		/*viewerSliceDepth = clamp(viewerSliceDepth, 0.0f, 1.0f);*/
+		if (viewerSliceDepth < 0.0f) viewerSliceDepth = 0.0f;
+		else if (viewerSliceDepth > 1.0f) viewerSliceDepth = 1.0f;
 	}
 	
 	// Render the graphics.
