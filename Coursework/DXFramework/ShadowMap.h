@@ -16,6 +16,6 @@ private:
 	ID3D11DepthStencilView* mDepthMapDSV;
 	ID3D11ShaderResourceView* mDepthMapSRV;
 	D3D11_VIEWPORT viewport;
-	ID3D11RenderTargetView* renderTargets[1];
+	//ID3D11RenderTargetView* renderTargets[1];
 	ID3D11Texture2D* depthMap;
 };

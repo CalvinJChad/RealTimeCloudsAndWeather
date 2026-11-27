@@ -57,6 +57,8 @@ void BaseApplication::init(HINSTANCE hinstance, HWND hwnd, int screenWidth, int 
 	camera->setPosition(0.0f, 0.0f, -10.0f);
 	camera->update();
 
+	camera->initialiseCameraDepthMap(renderer->getDevice(), sWidth, sHeight);
+
 	// Create the timer object (for delta time and FPS calculation.
 	timer = new Timer();
 

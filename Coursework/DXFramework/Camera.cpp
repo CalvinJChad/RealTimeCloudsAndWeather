@@ -1,6 +1,8 @@
 // Camera class
 // Represents a single 3D camera with basic movement.
 #include "camera.h"
+#include "ShadowMap.h"
+#include "d3d11.h"
 
 // Configure defaul camera (including positions, rotation and ortho matrix)
 Camera::Camera()
@@ -16,10 +18,22 @@ Camera::Camera()
 	position = XMVectorSet(0.0f, 0.0, -10.0, 1.0f);
 	lookAt = XMVectorSet(0.0f, 0.0f, 0.0f, 1.0);
 	orthoMatrix = XMMatrixLookAtLH(position, lookAt, up);
+
+	depthMap = nullptr;
 }
 
 Camera::~Camera()
 {
+	if (depthMap)
+	{
+		delete depthMap;
+		depthMap = 0;
+	}
+}
+
+void Camera::initialiseCameraDepthMap(ID3D11Device* device, int mWidth, int mHeight)
+{
+	depthMap = new ShadowMap(device, mWidth, mHeight);
 }
 
 // Store frame/delta time.
@@ -92,6 +106,11 @@ XMMATRIX Camera::getViewMatrix()
 XMMATRIX Camera::getOrthoViewMatrix()
 {
 	return orthoMatrix;
+}
+
+ShadowMap* Camera::getCameraDepthMap()
+{
+	return depthMap;
 }
 
 void Camera::moveForward()

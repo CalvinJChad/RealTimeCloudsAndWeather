@@ -16,6 +16,9 @@
 
 using namespace DirectX;
 
+class ShadowMap;
+struct ID3D11Device;
+
 class Camera
 {
 public:
@@ -32,6 +35,8 @@ public:
 	Camera();	///< Initialised default camera object
 	~Camera();
 
+	void initialiseCameraDepthMap(ID3D11Device* device, int mWidth, int mHeight);	///< Initialise the camera's depth map if the application requires it
+
 	void setPosition(float lx, float ly, float lz);		///< Set camera position directly
 	void setRotation(float lx, float ly, float lz);		///< Set camera rotation directly
 
@@ -41,6 +46,7 @@ public:
 	void update();				///< Update camera, recalculates view matrix based on rotation
 	XMMATRIX getViewMatrix();	///< Get current view matrix of camera
 	XMMATRIX getOrthoViewMatrix();	///< Get current orthographic view matrix for camera
+	ShadowMap* getCameraDepthMap();	///< Get the current depth map (ShadowMap) for camera
 
 	void setFrameTime(float);
 
@@ -63,6 +69,10 @@ private:
 	XMMATRIX orthoMatrix;	///< current orthographic matrix
 	float speed, frameTime;	///< movement speed and time variables
 	float lookSpeed;		///< rotation speed
+
+	/* Adding some additional functionality to the povided DXFramework. */
+	ShadowMap* depthMap;	///< using ShadowMap class as it contains all the functionality necessary for a depth map.
+
 };
 
 #endif
