@@ -9,6 +9,7 @@
 #include "WorleyComputeShader.h"
 #include "PerlinWorleyComputeShader.h"
 #include "ViewWorleySliceShader.h"
+#include "BaseDepthShader.h"
 
 using namespace std;
 
@@ -28,8 +29,12 @@ protected:
 
 	// Pipeline stages
 	void firstPass();	/* Currently empty */
+
 	void computePass();	/* Compute worley noise */
+
+	void cameraDepthPass();	/* Render scene from the perspective of camera to get depth value of objects */
 	void finalScenePass();	/* Render the scene */
+
 	void worleySlicePass();	/* Render slice of the generated 3D Worley noise texture */
 	void finalPass(RenderTexture* finalRT);	/* Renders passed in RT onto ortho mesh. Else, calls 'finalscenepass' */
 
@@ -42,6 +47,7 @@ protected:
 private:
 	// Shaders
 	unique_ptr<TextureShader> textureShader;
+	unique_ptr<BaseDepthShader> depthShader;
 	unique_ptr<WorleyComputeShader> worleyComputeShader;
 	unique_ptr<PerlinWorleyComputeShader> perlinWorleyComputeShader;
 	unique_ptr<ViewWorleySliceShader> viewWorleySliceShader;

@@ -1,6 +1,7 @@
 // Lab1.cpp
 // Lab 1 example, simple coloured triangle mesh
 #include "App1.h"
+#include "FPCamera.h"
 
 App1::App1()
 {
@@ -19,6 +20,7 @@ void App1::init(HINSTANCE hinstance, HWND hwnd, int screenWidth, int screenHeigh
 	
 	// Initialise shaders
 	textureShader = make_unique<TextureShader>(renderer->getDevice(), hwnd);
+	depthShader = make_unique<BaseDepthShader>(renderer->getDevice(), hwnd);
 	worleyComputeShader = make_unique<WorleyComputeShader>(renderer->getDevice(), hwnd, numCellsPerAxis, numCellsPerAxis, numCellsPerAxis);
 	perlinWorleyComputeShader = make_unique<PerlinWorleyComputeShader>(renderer->getDevice(), hwnd, numCellsPerAxis, numCellsPerAxis, numCellsPerAxis);
 	viewWorleySliceShader = make_unique<ViewWorleySliceShader>(renderer->getDevice(), hwnd);
@@ -81,6 +83,7 @@ bool App1::render()
 	switch (activeView)
 	{
 	case App1::ACTIVE_VIEW_SCENE:
+		cameraDepthPass();
 		finalScenePass();
 
 		break;
@@ -113,6 +116,29 @@ void App1::computePass()
 	perlinWorleyComputeShader->setShaderParameters(renderer->getDeviceContext());
 	perlinWorleyComputeShader->compute(renderer->getDeviceContext(), numCellsPerAxis / Num_Threads_Per_Group.x, numCellsPerAxis / Num_Threads_Per_Group.y, numCellsPerAxis / Num_Threads_Per_Group.z);
 	perlinWorleyComputeShader->unbind(renderer->getDeviceContext());
+}
+
+void App1::cameraDepthPass()
+{
+	// Set the render target to be the render to this camera's depth map texture.
+	camera->getCameraDepthMap()->BindDsvAndSetNullRenderTarget(renderer->getDeviceContext());
+
+	XMMATRIX worldMatrix = renderer->getWorldMatrix();
+	XMMATRIX viewMatrix = camera->getViewMatrix();
+	XMMATRIX projectionMatrix = renderer->getProjectionMatrix();
+
+	// Render objects in scene
+	{
+		worldMatrix = XMMatrixTranslation(-50.f, 0.f, -10.f);
+		// Render floor
+		planeMesh->sendData(renderer->getDeviceContext());
+		depthShader->setShaderParameters(renderer->getDeviceContext(), worldMatrix, viewMatrix, projectionMatrix);
+		depthShader->render(renderer->getDeviceContext(), planeMesh->getIndexCount());
+	}
+
+	// Set back buffer as render target and reset view port.
+	renderer->setBackBufferRenderTarget();
+	renderer->resetViewport();
 }
 
 void App1::finalScenePass()
