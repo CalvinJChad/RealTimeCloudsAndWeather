@@ -24,13 +24,17 @@ void App1::init(HINSTANCE hinstance, HWND hwnd, int screenWidth, int screenHeigh
 	worleyComputeShader = make_unique<WorleyComputeShader>(renderer->getDevice(), hwnd, numCellsPerAxis, numCellsPerAxis, numCellsPerAxis);
 	perlinWorleyComputeShader = make_unique<PerlinWorleyComputeShader>(renderer->getDevice(), hwnd, numCellsPerAxis, numCellsPerAxis, numCellsPerAxis);
 	viewWorleySliceShader = make_unique<ViewWorleySliceShader>(renderer->getDevice(), hwnd);
+	volumetricCloudsShader = make_unique<VolumetricCloudsShader>(renderer->getDevice(), hwnd);
 
 	// Initialise meshes
+	renderVolume = make_unique<BoundingBoxVolume>(renderer->getDevice(), renderer->getDeviceContext(), renderVolumeExtent.x, renderVolumeExtent.y, renderVolumeExtent.z);
+	testCube = make_unique<CubeMesh>(renderer->getDevice(), renderer->getDeviceContext(), 1);
 	planeMesh = make_unique<PlaneMesh>(renderer->getDevice(), renderer->getDeviceContext());
 	orthoMesh = make_unique<OrthoMesh>(renderer->getDevice(), renderer->getDeviceContext(), screenWidth, screenHeight);	// Assuming I need to make the ortho mesh the same size as the camera.
 
 	// Initialise RT objects. One needed to store the worley slice view.
 	worleySliceViewRT = make_unique<RenderTexture>(renderer->getDevice(), numCellsPerAxis, numCellsPerAxis, 0.1f, 100.f);	// Assuming I make the render texture the same size as the Worley noise texture.
+
 }
 
 
@@ -61,6 +65,8 @@ bool App1::frame()
 		if (viewerSliceDepth < 0.0f) viewerSliceDepth = 0.0f;
 		else if (viewerSliceDepth > 1.0f) viewerSliceDepth = 1.0f;
 	}
+
+	renderVolume->updateVolume(renderer->getDevice(), renderVolumeExtent.x, renderVolumeExtent.y, renderVolumeExtent.z);
 	
 	// Render the graphics.
 	result = render();
@@ -146,6 +152,8 @@ void App1::finalScenePass()
 	// Clear the scene. (default blue colour)
 	renderer->beginScene(backgroundColour.x, backgroundColour.y, backgroundColour.z, backgroundColour.w);
 
+	XMMATRIX translationMatrix, rotationMatrix, scaleMatrix;
+
 	// Get the world, view, projection, and ortho matrices from the camera and Direct3D objects.
 	XMMATRIX worldMatrix = renderer->getWorldMatrix();
 	XMMATRIX viewMatrix = camera->getViewMatrix();
@@ -158,6 +166,21 @@ void App1::finalScenePass()
 		planeMesh->sendData(renderer->getDeviceContext());
 		textureShader->setShaderParameters(renderer->getDeviceContext(), worldMatrix, viewMatrix, projectionMatrix, textureMgr->getTexture(L"brick"));
 		textureShader->render(renderer->getDeviceContext(), planeMesh->getIndexCount());
+
+		//// TESTING CUBE MESH
+		//worldMatrix = XMMatrixTranslation(0.f, 10.f, 30.f);
+		//// Render cube
+		//testCube->sendData(renderer->getDeviceContext());
+		//textureShader->setShaderParameters(renderer->getDeviceContext(), worldMatrix, viewMatrix, projectionMatrix, textureMgr->getTexture(L"brick"));
+		//textureShader->render(renderer->getDeviceContext(), testCube->getIndexCount());
+
+		rotationMatrix = XMMatrixRotationRollPitchYaw(-XMConvertToRadians(renderVolumeRotation.x), XMConvertToRadians(renderVolumeRotation.y), XMConvertToRadians(renderVolumeRotation.z));
+		translationMatrix = XMMatrixTranslation(renderVolumePosition.x, renderVolumePosition.y, renderVolumePosition.z);
+		worldMatrix = XMMatrixMultiply(rotationMatrix, translationMatrix);
+		// Render skybox volume
+		renderVolume->sendData(renderer->getDeviceContext());
+		volumetricCloudsShader->setShaderParameters(renderer->getDeviceContext(), worldMatrix, viewMatrix, projectionMatrix, renderVolume->getMinBounds(), renderVolume->getMaxBounds());
+		volumetricCloudsShader->render(renderer->getDeviceContext(), renderVolume->getIndexCount());
 	}
 
 }
@@ -247,6 +270,13 @@ void App1::gui()
 			}
 			ImGui::EndCombo();
 		}
+	}
+
+	if (ImGui::CollapsingHeader("Render Volume"))
+	{
+		ImGui::DragFloat3("Position:", &renderVolumePosition.x, 0.5f, -100.0f, 100.0f);
+		ImGui::DragFloat3("Rotation:", &renderVolumeRotation.x, 0.5f, -360.0f, 360.0f);
+		ImGui::DragFloat3("Box Extent:", &renderVolumeExtent.x, 0.5f, 1.0f, 100.0f);
 	}
 
 	if (ImGui::CollapsingHeader("Debug Worley Noise"))

@@ -10,6 +10,9 @@
 #include "PerlinWorleyComputeShader.h"
 #include "ViewWorleySliceShader.h"
 #include "BaseDepthShader.h"
+#include "VolumetricCloudsShader.h"
+// Other stuff
+#include "BoundingBoxVolume.h"
 
 using namespace std;
 
@@ -51,8 +54,11 @@ private:
 	unique_ptr<WorleyComputeShader> worleyComputeShader;
 	unique_ptr<PerlinWorleyComputeShader> perlinWorleyComputeShader;
 	unique_ptr<ViewWorleySliceShader> viewWorleySliceShader;
+	unique_ptr<VolumetricCloudsShader> volumetricCloudsShader;
 
 	// Meshes
+	unique_ptr<CubeMesh> testCube;
+	unique_ptr<BoundingBoxVolume> renderVolume;
 	unique_ptr<PlaneMesh> planeMesh;
 	unique_ptr<OrthoMesh> orthoMesh;
 
@@ -74,6 +80,10 @@ private:
 	const char* viewNames[2] = { "Scene", "Noise Debugger" };
 	Active_Channel_Type activeChannel = ACTIVE_CHANNEL_R;
 	const char* channelNames[4] = { "R", "G", "B", "A" };	// Channel names used by ImGui Combo Box for Active Noise Channel.
+	/* Render volume values */
+	XMFLOAT3 renderVolumePosition = XMFLOAT3(0.f, 10.f, 30.f);
+	XMFLOAT3 renderVolumeRotation = XMFLOAT3(0.f, 0.f, 0.f);
+	XMFLOAT3 renderVolumeExtent = XMFLOAT3(10.0f, 10.0f, 10.0f);
 };
 
 static const XMINT3 Num_Threads_Per_Group = XMINT3(8, 8, 8);	// Make sure this is up-to-date with cs number of threads defenition.
