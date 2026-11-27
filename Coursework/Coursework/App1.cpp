@@ -179,7 +179,7 @@ void App1::finalScenePass()
 		worldMatrix = XMMatrixMultiply(rotationMatrix, translationMatrix);
 		// Render skybox volume
 		renderVolume->sendData(renderer->getDeviceContext());
-		volumetricCloudsShader->setShaderParameters(renderer->getDeviceContext(), worldMatrix, viewMatrix, projectionMatrix, renderVolume->getMinBounds(), renderVolume->getMaxBounds());
+		volumetricCloudsShader->setShaderParameters(renderer->getDeviceContext(), worldMatrix, viewMatrix, projectionMatrix, renderVolume->getMinBounds(), renderVolume->getMaxBounds(), perlinWorleyComputeShader->getSRV(), camera->getPosition(), camera->getCameraDepthMap()->getDepthMapSRV());
 		volumetricCloudsShader->render(renderer->getDeviceContext(), renderVolume->getIndexCount());
 	}
 
