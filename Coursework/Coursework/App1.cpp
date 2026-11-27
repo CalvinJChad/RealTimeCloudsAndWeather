@@ -77,9 +77,19 @@ bool App1::render()
 
 	firstPass();
 	computePass();	// Compute Worley noise.
-	//finalScenePass();
-	worleySlicePass();
-	finalPass(worleySliceViewRT.get());
+
+	switch (activeView)
+	{
+	case App1::ACTIVE_VIEW_SCENE:
+		finalScenePass();
+
+		break;
+	case App1::ACTIVE_VIEW_DEBUG_NOISE:
+		worleySlicePass();
+		finalPass(worleySliceViewRT.get());
+
+		break;
+	}
 
 	// Render GUI
 	gui();
@@ -189,6 +199,29 @@ void App1::gui()
 	// Build UI
 	ImGui::Text("FPS: %.2f", timer->getFPS());
 	ImGui::Checkbox("Wireframe mode", &wireframeToggle);
+
+	// Select view type
+	{
+		const char* previewValue = viewNames[static_cast<int>(activeView)];
+		if (ImGui::BeginCombo("Select View", previewValue)) {
+			for (int i = 0; i < IM_ARRAYSIZE(viewNames); i++)
+			{
+				const bool isSelected = (static_cast<int>(activeView) == i);
+
+				if (ImGui::Selectable(viewNames[i], isSelected))
+				{
+					activeView = static_cast<Active_View_Type>(i);
+				}
+
+				// Set the initial focus when opening the combo (scrolling + keyboard navigation)
+				if (isSelected)
+				{
+					ImGui::SetItemDefaultFocus();
+				}
+			}
+			ImGui::EndCombo();
+		}
+	}
 
 	if (ImGui::CollapsingHeader("Debug Worley Noise"))
 	{

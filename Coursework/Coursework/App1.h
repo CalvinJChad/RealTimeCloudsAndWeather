@@ -33,6 +33,12 @@ protected:
 	void worleySlicePass();	/* Render slice of the generated 3D Worley noise texture */
 	void finalPass(RenderTexture* finalRT);	/* Renders passed in RT onto ortho mesh. Else, calls 'finalscenepass' */
 
+	enum Active_View_Type : uint32_t
+	{
+		ACTIVE_VIEW_SCENE = 0,
+		ACTIVE_VIEW_DEBUG_NOISE
+	};
+
 private:
 	// Shaders
 	unique_ptr<TextureShader> textureShader;
@@ -57,8 +63,11 @@ private:
 	bool viewerGreyscale = true;
 	bool viewerShowAllChannels = false;
 	float viewerSliceDepth = 0.0f;
+	/* ImGui enum selector values */
+	Active_View_Type activeView = ACTIVE_VIEW_SCENE;
+	const char* viewNames[2] = { "Scene", "Noise Debugger" };
 	Active_Channel_Type activeChannel = ACTIVE_CHANNEL_R;
-	const char* channelNames[4] = { "R", "G", "B", "A" };	// Channel names used by ImGui Combo Box.
+	const char* channelNames[4] = { "R", "G", "B", "A" };	// Channel names used by ImGui Combo Box for Active Noise Channel.
 };
 
 static const XMINT3 Num_Threads_Per_Group = XMINT3(8, 8, 8);	// Make sure this is up-to-date with cs number of threads defenition.
