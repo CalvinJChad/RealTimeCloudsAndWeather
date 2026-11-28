@@ -65,6 +65,9 @@ private:
 	// Render Textures
 	unique_ptr<RenderTexture> worleySliceViewRT;
 
+	// ShadowMap Test
+	unique_ptr<ShadowMap> cameraDepthMap;
+
 	// Background
 	XMFLOAT4 backgroundColour = backgroundColour = XMFLOAT4(0.39f, 0.58f, 0.92f, 1.0f);
 

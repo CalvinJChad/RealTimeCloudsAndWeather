@@ -73,13 +73,18 @@ void VolumetricCloudsShader::initShader(const wchar_t* vsFilename, const wchar_t
 	// Create a texture sampler state description for the camera depth texture.
 	D3D11_SAMPLER_DESC depthSamplerDesc;
 	depthSamplerDesc.Filter = D3D11_FILTER_MIN_MAG_MIP_POINT;
-	depthSamplerDesc.AddressU = D3D11_TEXTURE_ADDRESS_BORDER;
-	depthSamplerDesc.AddressV = D3D11_TEXTURE_ADDRESS_BORDER;
-	depthSamplerDesc.AddressW = D3D11_TEXTURE_ADDRESS_BORDER;
+	depthSamplerDesc.AddressU = D3D11_TEXTURE_ADDRESS_CLAMP;
+	depthSamplerDesc.AddressV = D3D11_TEXTURE_ADDRESS_CLAMP;
+	depthSamplerDesc.AddressW = D3D11_TEXTURE_ADDRESS_CLAMP;
 	depthSamplerDesc.BorderColor[0] = 1.0f;
 	depthSamplerDesc.BorderColor[1] = 1.0f;
 	depthSamplerDesc.BorderColor[2] = 1.0f;
 	depthSamplerDesc.BorderColor[3] = 1.0f;
+	depthSamplerDesc.MipLODBias = 0.0f;
+	depthSamplerDesc.MaxAnisotropy = 1;
+	depthSamplerDesc.ComparisonFunc = D3D11_COMPARISON_ALWAYS;
+	depthSamplerDesc.MinLOD = 0;
+	depthSamplerDesc.MaxLOD = D3D11_FLOAT32_MAX;
 	renderer->CreateSamplerState(&depthSamplerDesc, &depthSampleState);
 
 	// Create a texture sampler state description for the 3D Perlin-Worley noise texture.
@@ -119,7 +124,7 @@ void VolumetricCloudsShader::initShader(const wchar_t* vsFilename, const wchar_t
 
 }
 
-void VolumetricCloudsShader::setShaderParameters(ID3D11DeviceContext* deviceContext, const XMMATRIX& worldMatrix, const XMMATRIX& viewMatrix, const XMMATRIX& projectionMatrix, XMFLOAT3 minBounds, XMFLOAT3 maxBounds, ID3D11ShaderResourceView* shapeNoiseTexture, XMFLOAT3 cameraPos, ID3D11ShaderResourceView* cameraDepthTexture)
+void VolumetricCloudsShader::setShaderParameters(ID3D11DeviceContext* deviceContext, const XMMATRIX& worldMatrix, const XMMATRIX& viewMatrix, const XMMATRIX& projectionMatrix, XMFLOAT3 minBounds, XMFLOAT3 maxBounds, ID3D11ShaderResourceView* shapeNoiseTexture, XMFLOAT3 cameraPos, ShadowMap* cameraDepthMap)
 {
 	HRESULT result;
 	D3D11_MAPPED_SUBRESOURCE mappedResource;
@@ -161,8 +166,10 @@ void VolumetricCloudsShader::setShaderParameters(ID3D11DeviceContext* deviceCont
 		deviceContext->PSSetConstantBuffers(0, 1, &boundingBoxBuffer);
 	}
 
+	ID3D11ShaderResourceView* cameraDepthTexture = cameraDepthMap->getDepthMapSRV();
+
 	// Set shader texture and sampler resource in the pixel shader.
-	deviceContext->PSGetShaderResources(0, 1, &cameraDepthTexture);
+	deviceContext->PSSetShaderResources(0, 1, &cameraDepthTexture);	// I initially had 'PSGetShaderResources' instead of 'PSSetShaderResources'. So I spent 5 hours trying to figure out why the brick texture was being passed into this stupid shader.
 	deviceContext->PSSetSamplers(0, 1, &depthSampleState);
 	deviceContext->PSSetShaderResources(1, 1, &shapeNoiseTexture);
 	deviceContext->PSSetSamplers(1, 1, &noiseSampleState);

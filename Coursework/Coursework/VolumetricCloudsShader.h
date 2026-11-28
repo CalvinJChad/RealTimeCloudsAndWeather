@@ -1,6 +1,7 @@
 #pragma once
 
 #include "BaseShader.h"
+#include "ShadowMap.h"
 
 using namespace std;
 using namespace DirectX;
@@ -30,7 +31,7 @@ public:
 	VolumetricCloudsShader(ID3D11Device* device, HWND hwnd);
 	~VolumetricCloudsShader();
 
-	void setShaderParameters(ID3D11DeviceContext* deviceContext, const XMMATRIX& world, const XMMATRIX& view, const XMMATRIX& projection, XMFLOAT3 minBounds, XMFLOAT3 maxBounds, ID3D11ShaderResourceView* shapeNoiseTexture, XMFLOAT3 cameraPos, ID3D11ShaderResourceView* cameraDepthTexture);
+	void setShaderParameters(ID3D11DeviceContext* deviceContext, const XMMATRIX& world, const XMMATRIX& view, const XMMATRIX& projection, XMFLOAT3 minBounds, XMFLOAT3 maxBounds, ID3D11ShaderResourceView* shapeNoiseTexture, XMFLOAT3 cameraPos, ShadowMap* cameraDepthMap);
 
 private:
 	void initShader(const wchar_t* vs, const wchar_t* ps);

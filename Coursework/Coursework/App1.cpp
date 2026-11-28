@@ -17,6 +17,7 @@ void App1::init(HINSTANCE hinstance, HWND hwnd, int screenWidth, int screenHeigh
 
 	// Load textures
 	textureMgr->loadTexture(L"brick", L"res/brick1.dds");
+	textureMgr->loadTexture(L"wood", L"res/wood.png");	// TESTING
 	
 	// Initialise shaders
 	textureShader = make_unique<TextureShader>(renderer->getDevice(), hwnd);
@@ -35,6 +36,8 @@ void App1::init(HINSTANCE hinstance, HWND hwnd, int screenWidth, int screenHeigh
 	// Initialise RT objects. One needed to store the worley slice view.
 	worleySliceViewRT = make_unique<RenderTexture>(renderer->getDevice(), numCellsPerAxis, numCellsPerAxis, 0.1f, 100.f);	// Assuming I make the render texture the same size as the Worley noise texture.
 
+	//TESTING
+	cameraDepthMap = make_unique<ShadowMap>(renderer->getDevice(), screenWidth, screenHeight);
 }
 
 
@@ -127,7 +130,8 @@ void App1::computePass()
 void App1::cameraDepthPass()
 {
 	// Set the render target to be the render to this camera's depth map texture.
-	camera->getCameraDepthMap()->BindDsvAndSetNullRenderTarget(renderer->getDeviceContext());
+	//camera->getCameraDepthMap()->BindDsvAndSetNullRenderTarget(renderer->getDeviceContext());
+	cameraDepthMap->BindDsvAndSetNullRenderTarget(renderer->getDeviceContext());
 
 	XMMATRIX worldMatrix = renderer->getWorldMatrix();
 	XMMATRIX viewMatrix = camera->getViewMatrix();
@@ -140,6 +144,12 @@ void App1::cameraDepthPass()
 		planeMesh->sendData(renderer->getDeviceContext());
 		depthShader->setShaderParameters(renderer->getDeviceContext(), worldMatrix, viewMatrix, projectionMatrix);
 		depthShader->render(renderer->getDeviceContext(), planeMesh->getIndexCount());
+
+		worldMatrix = XMMatrixTranslation(0.f, 10.f, 30.f);
+		// Render cube
+		testCube->sendData(renderer->getDeviceContext());
+		depthShader->setShaderParameters(renderer->getDeviceContext(), worldMatrix, viewMatrix, projectionMatrix);
+		depthShader->render(renderer->getDeviceContext(), testCube->getIndexCount());
 	}
 
 	// Set back buffer as render target and reset view port.
@@ -167,19 +177,20 @@ void App1::finalScenePass()
 		textureShader->setShaderParameters(renderer->getDeviceContext(), worldMatrix, viewMatrix, projectionMatrix, textureMgr->getTexture(L"brick"));
 		textureShader->render(renderer->getDeviceContext(), planeMesh->getIndexCount());
 
-		//// TESTING CUBE MESH
-		//worldMatrix = XMMatrixTranslation(0.f, 10.f, 30.f);
-		//// Render cube
-		//testCube->sendData(renderer->getDeviceContext());
-		//textureShader->setShaderParameters(renderer->getDeviceContext(), worldMatrix, viewMatrix, projectionMatrix, textureMgr->getTexture(L"brick"));
-		//textureShader->render(renderer->getDeviceContext(), testCube->getIndexCount());
+		// TESTING CUBE MESH
+		worldMatrix = XMMatrixTranslation(0.f, 10.f, 30.f);
+		// Render cube
+		testCube->sendData(renderer->getDeviceContext());
+		textureShader->setShaderParameters(renderer->getDeviceContext(), worldMatrix, viewMatrix, projectionMatrix, textureMgr->getTexture(L"wood"));
+		/*textureShader->setShaderParameters(renderer->getDeviceContext(), worldMatrix, viewMatrix, projectionMatrix, cameraDepthMap->getDepthMapSRV());*/
+		textureShader->render(renderer->getDeviceContext(), testCube->getIndexCount());
 
 		rotationMatrix = XMMatrixRotationRollPitchYaw(-XMConvertToRadians(renderVolumeRotation.x), XMConvertToRadians(renderVolumeRotation.y), XMConvertToRadians(renderVolumeRotation.z));
 		translationMatrix = XMMatrixTranslation(renderVolumePosition.x, renderVolumePosition.y, renderVolumePosition.z);
 		worldMatrix = XMMatrixMultiply(rotationMatrix, translationMatrix);
 		// Render skybox volume
 		renderVolume->sendData(renderer->getDeviceContext());
-		volumetricCloudsShader->setShaderParameters(renderer->getDeviceContext(), worldMatrix, viewMatrix, projectionMatrix, renderVolume->getMinBounds(), renderVolume->getMaxBounds(), perlinWorleyComputeShader->getSRV(), camera->getPosition(), camera->getCameraDepthMap()->getDepthMapSRV());
+		volumetricCloudsShader->setShaderParameters(renderer->getDeviceContext(), worldMatrix, viewMatrix, projectionMatrix, renderVolume->getMinBounds(), renderVolume->getMaxBounds(), perlinWorleyComputeShader->getSRV(), camera->getPosition(), cameraDepthMap.get());
 		volumetricCloudsShader->render(renderer->getDeviceContext(), renderVolume->getIndexCount());
 	}
 
