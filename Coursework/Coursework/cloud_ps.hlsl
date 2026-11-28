@@ -5,14 +5,14 @@
 // Code from Sebastian Lague's 'Coding Adventure: Clouds' https://github.com/SebLague/Clouds
 // =====================================================================================
 
-// Buffer for bounding box volume attributes.
-cbuffer BoundingBoxVolumeBuffer : register(b0)
-{
-    float3 boundsMin;
-    float padding0;
-    float3 boundsMax;
-    float padding1;
-};
+//// Buffer for bounding box volume attributes.
+//cbuffer BoundingBoxVolumeBuffer : register(b0)
+//{
+//    float3 boundsMin;
+//    float padding0;
+//    float3 boundsMax;
+//    float padding1;
+//};
 
 // Texture and sampler registers
 //Texture2D mainTexture : register(t0);
@@ -33,9 +33,11 @@ struct InputType
 {
     float4 position : SV_POSITION;
     float2 tex : TEXCOORD0;
-    float3 worldPosition : TEXCOORD1;       // Position of the vertex in the world
+    float3 worldPosition : TEXCOORD1; // Position of the vertex in world space
     float3 cameraWorldPosition : TEXCOORD2; // The position of the camera in world space
-    float3 viewVector : TEXCOORD3;          // The view vector of the camera
+    float3 viewVector : TEXCOORD3; // The view vector of the camera
+    float3 boundMinWorldPosition : TEXCOORD4; // Position of the minimum bounds of the bounding box volume in world space
+    float3 boundMaxWorldPosition : TEXCOORD5; // Position of the maximum bounds of the bounding box volume in world space
 };
 
 float2 getProjectiveCoords(float4 position)
@@ -56,8 +58,13 @@ float2 rayBoxDst(float3 boundsMin, float3 boundsMax, float3 rayOrigin, float3 in
     float3 tmin = min(t0, t1);
     float3 tmax = max(t0, t1);
                 
-    float dstA = max(max(tmin.x, tmin.y), tmin.z);
-    float dstB = min(tmax.x, min(tmax.y, tmax.z));
+    //float dstA = max(max(tmin.x, tmin.y), tmin.z);
+    //float dstB = min(tmax.x, min(tmax.y, tmax.z));
+    
+    // Suggested algorithm doesn't seem to work for calculating dstToBox/dstInsideBox.
+    // This algorithm is much less efficient (sqrt function is expensive). But for now it works.
+    float dstA = sqrt((tmin.x * tmin.x) + (tmin.y * tmin.y) + (tmin.z * tmin.z));
+    float dstB = sqrt((tmax.x * tmax.x) + (tmax.y * tmax.y) + (tmax.z * tmax.z));
 
     // CASE 1: ray intersects box from outside (0 <= dstA <= dstB)
     // dstA is dst to nearest intersection, dstB dst to far intersection
@@ -67,8 +74,12 @@ float2 rayBoxDst(float3 boundsMin, float3 boundsMax, float3 rayOrigin, float3 in
 
     // CASE 3: ray misses box (dstA > dstB)
 
+    //float dstToBox = max(0, dstA);
+    //float dstInsideBox = max(0, dstB - dstToBox);
+    
     float dstToBox = max(0, dstA);
     float dstInsideBox = max(0, dstB - dstToBox);
+    
     return float2(dstToBox, dstInsideBox);
 }
 
@@ -87,12 +98,13 @@ float4 main(InputType input) : SV_TARGET
     shapeNoiseTexture.GetDimensions(tWidth, tHeight, tDepth);
     
     float2 uvDepthPos = getProjectiveCoords(input.position);
-    float depthValue = cameraDepthTexture.Sample(depthSampler, uvDepthPos).r;
+    //float depthValue = cameraDepthTexture.Sample(depthSampler, uvDepthPos).r;
+    float depthValue = cameraDepthTexture.Sample(depthSampler, input.tex).r;
     
     float3 rayOrigin = input.cameraWorldPosition;
     float3 rayDirection = input.viewVector;
     
-    float2 rayBoxInfo = rayBoxDst(boundsMin, boundsMax, rayOrigin, rayDirection);
+    float2 rayBoxInfo = rayBoxDst(input.boundMinWorldPosition, input.boundMaxWorldPosition, rayOrigin, rayDirection);
     float dstToBox = rayBoxInfo.x;
     float dstInBox = rayBoxInfo.y;
     
@@ -100,7 +112,7 @@ float4 main(InputType input) : SV_TARGET
     float stepSize = dstInBox / numSteps;
     //float dstLimit = min()
     
-    bool rayHitBox = dstInBox > 0.f && dstToBox < depthValue;
+    bool rayHitBox = dstInBox > 0.f/* && dstToBox < depthValue*/;
     if (rayHitBox)
     {
         return float4(0.0f, 0.0f, 0.0f, 1.0f);

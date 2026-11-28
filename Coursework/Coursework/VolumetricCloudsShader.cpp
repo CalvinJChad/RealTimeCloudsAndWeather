@@ -102,6 +102,16 @@ void VolumetricCloudsShader::initShader(const wchar_t* vsFilename, const wchar_t
 	// Create the texture sampler state.
 	renderer->CreateSamplerState(&noiseSamplerDesc, &noiseSampleState);
 
+	// Setup bounding box buffer (for vertex shader)
+	D3D11_BUFFER_DESC boundingBoxBufferDesc;
+	boundingBoxBufferDesc.Usage = D3D11_USAGE_DYNAMIC;
+	boundingBoxBufferDesc.ByteWidth = sizeof(BoundingBoxVolumeBufferType);
+	boundingBoxBufferDesc.BindFlags = D3D11_BIND_CONSTANT_BUFFER;
+	boundingBoxBufferDesc.CPUAccessFlags = D3D11_CPU_ACCESS_WRITE;
+	boundingBoxBufferDesc.MiscFlags = 0;
+	boundingBoxBufferDesc.StructureByteStride = 0;
+	renderer->CreateBuffer(&boundingBoxBufferDesc, NULL, &boundingBoxBuffer);
+
 	// Setup camera buffer (for vertex shader)
 	D3D11_BUFFER_DESC cameraBufferDesc;
 	cameraBufferDesc.Usage = D3D11_USAGE_DYNAMIC;
@@ -111,16 +121,6 @@ void VolumetricCloudsShader::initShader(const wchar_t* vsFilename, const wchar_t
 	cameraBufferDesc.MiscFlags = 0;
 	cameraBufferDesc.StructureByteStride = 0;
 	renderer->CreateBuffer(&cameraBufferDesc, NULL, &cameraBuffer);
-
-	// Setup bounding box buffer (for pixel shader)
-	D3D11_BUFFER_DESC boundingBoxBufferDesc;
-	boundingBoxBufferDesc.Usage = D3D11_USAGE_DYNAMIC;
-	boundingBoxBufferDesc.ByteWidth = sizeof(BoundingBoxVolumeBufferType);
-	boundingBoxBufferDesc.BindFlags = D3D11_BIND_CONSTANT_BUFFER;
-	boundingBoxBufferDesc.CPUAccessFlags = D3D11_CPU_ACCESS_WRITE;
-	boundingBoxBufferDesc.MiscFlags = 0;
-	boundingBoxBufferDesc.StructureByteStride = 0;
-	renderer->CreateBuffer(&boundingBoxBufferDesc, NULL, &boundingBoxBuffer);
 
 }
 
@@ -145,6 +145,16 @@ void VolumetricCloudsShader::setShaderParameters(ID3D11DeviceContext* deviceCont
 	deviceContext->Unmap(matrixBuffer, 0);
 	deviceContext->VSSetConstantBuffers(0, 1, &matrixBuffer);
 
+	// Send bounding box data to vertex shader
+	{
+		result = deviceContext->Map(boundingBoxBuffer, 0, D3D11_MAP_WRITE_DISCARD, 0, &mappedResource);
+		BoundingBoxVolumeBufferType* boxData = (BoundingBoxVolumeBufferType*)mappedResource.pData;
+		boxData->boundsMin = XMFLOAT4(minBounds.x, minBounds.y, minBounds.z, 1.0f);
+		boxData->boundsMax = XMFLOAT4(maxBounds.x, maxBounds.y, maxBounds.z, 1.0f);
+		deviceContext->Unmap(boundingBoxBuffer, 0);
+		deviceContext->VSSetConstantBuffers(1, 1, &boundingBoxBuffer);
+	}
+
 	// Send camera data to vertex shader
 	{
 		result = deviceContext->Map(cameraBuffer, 0, D3D11_MAP_WRITE_DISCARD, 0, &mappedResource);
@@ -152,18 +162,7 @@ void VolumetricCloudsShader::setShaderParameters(ID3D11DeviceContext* deviceCont
 		cameraPtr->cameraPosition = cameraPos;
 		cameraPtr->padding = 0.0f;
 		deviceContext->Unmap(cameraBuffer, 0);
-		deviceContext->VSSetConstantBuffers(1, 1, &cameraBuffer);
-	}
-
-	// Send bounding box data to pixel shader
-	{
-		result = deviceContext->Map(boundingBoxBuffer, 0, D3D11_MAP_WRITE_DISCARD, 0, &mappedResource);
-		BoundingBoxVolumeBufferType* boxData = (BoundingBoxVolumeBufferType*)mappedResource.pData;
-		boxData->boundsMin = minBounds;
-		boxData->boundsMax = maxBounds;
-		boxData->padding0 = boxData->padding1 = 0.f;
-		deviceContext->Unmap(boundingBoxBuffer, 0);
-		deviceContext->PSSetConstantBuffers(0, 1, &boundingBoxBuffer);
+		deviceContext->VSSetConstantBuffers(2, 1, &cameraBuffer);
 	}
 
 	ID3D11ShaderResourceView* cameraDepthTexture = cameraDepthMap->getDepthMapSRV();

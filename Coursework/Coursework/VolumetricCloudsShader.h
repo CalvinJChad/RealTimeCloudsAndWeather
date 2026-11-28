@@ -12,6 +12,12 @@ private:
 
 	// Vertex Shader
 
+	struct BoundingBoxVolumeBufferType
+	{
+		XMFLOAT4 boundsMin;
+		XMFLOAT4 boundsMax;
+	};
+
 	struct CameraBufferType
 	{
 		XMFLOAT3 cameraPosition;
@@ -19,13 +25,7 @@ private:
 	};
 
 	// Pixel/Fragment Shader
-	struct BoundingBoxVolumeBufferType
-	{
-		XMFLOAT3 boundsMin;
-		float padding0;
-		XMFLOAT3 boundsMax;
-		float padding1;
-	};
+	//...
 
 public:
 	VolumetricCloudsShader(ID3D11Device* device, HWND hwnd);
