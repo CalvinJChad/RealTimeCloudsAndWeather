@@ -5,7 +5,12 @@
 
 App1::App1()
 {
-	
+	// Default cloud data
+	cloudData.cloudOffset = XMFLOAT3(0.f, 0.f, 0.f);
+	cloudData.cloudScale = 50.f;
+	cloudData.densityThreshold = 0.5f;
+	cloudData.densityMultiplier = 5.f;
+	cloudData.numSteps = 11;
 }
 
 void App1::init(HINSTANCE hinstance, HWND hwnd, int screenWidth, int screenHeight, Input *in, bool VSYNC, bool FULL_SCREEN)
@@ -190,7 +195,7 @@ void App1::finalScenePass()
 		worldMatrix = XMMatrixMultiply(rotationMatrix, translationMatrix);
 		// Render skybox volume
 		renderVolume->sendData(renderer->getDeviceContext());
-		volumetricCloudsShader->setShaderParameters(renderer->getDeviceContext(), worldMatrix, viewMatrix, projectionMatrix, renderVolume->getMinBounds(), renderVolume->getMaxBounds(), perlinWorleyComputeShader->getSRV(), camera->getPosition(), cameraDepthMap.get());
+		volumetricCloudsShader->setShaderParameters(renderer->getDeviceContext(), worldMatrix, viewMatrix, projectionMatrix, renderVolume->getMinBounds(), renderVolume->getMaxBounds(), perlinWorleyComputeShader->getSRV(), camera->getPosition(), cameraDepthMap.get(), cloudData);
 		volumetricCloudsShader->render(renderer->getDeviceContext(), renderVolume->getIndexCount());
 	}
 
@@ -285,9 +290,18 @@ void App1::gui()
 
 	if (ImGui::CollapsingHeader("Render Volume"))
 	{
-		ImGui::DragFloat3("Position:", &renderVolumePosition.x, 0.5f, -100.0f, 100.0f);
-		ImGui::DragFloat3("Rotation:", &renderVolumeRotation.x, 0.5f, -360.0f, 360.0f);
-		ImGui::DragFloat3("Box Extent:", &renderVolumeExtent.x, 0.5f, 1.0f, 100.0f);
+		ImGui::DragFloat3("Position", &renderVolumePosition.x, 0.5f, -100.0f, 100.0f);
+		ImGui::DragFloat3("Rotation", &renderVolumeRotation.x, 0.5f, -360.0f, 360.0f);
+		ImGui::DragFloat3("Box Extent", &renderVolumeExtent.x, 0.5f, 1.0f, 100.0f);
+	}
+
+	if (ImGui::CollapsingHeader("Cloud Data"))
+	{
+		ImGui::DragFloat3("Cloud Offset", &cloudData.cloudOffset.x, 0.5f, -100.0f, 100.0f);
+		ImGui::DragFloat("Cloud Scale", &cloudData.cloudScale, 0.1f, 1.f, 100.f);
+		ImGui::DragFloat("Density Threshold", &cloudData.densityThreshold, 0.01f, 0.1f, 0.9f);
+		ImGui::DragFloat("Density Multiplier", &cloudData.densityMultiplier, 0.01f, 0.1f, 10.f);
+		ImGui::DragInt("Num Steps", &cloudData.numSteps, 1, 100);
 	}
 
 	if (ImGui::CollapsingHeader("Debug Worley Noise"))

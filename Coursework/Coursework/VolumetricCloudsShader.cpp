@@ -1,4 +1,5 @@
 #include "VolumetricCloudsShader.h"
+#include "App1.h"
 
 VolumetricCloudsShader::VolumetricCloudsShader(ID3D11Device* device, HWND hwnd)
 	: BaseShader(device, hwnd)
@@ -47,6 +48,12 @@ VolumetricCloudsShader::~VolumetricCloudsShader()
 		boundingBoxBuffer = 0;
 	}
 
+	if (inverseMatrixBuffer)
+	{
+		inverseMatrixBuffer->Release();
+		inverseMatrixBuffer = 0;
+	}
+
 	//Release base shader components
 	BaseShader::~BaseShader();
 }
@@ -90,9 +97,9 @@ void VolumetricCloudsShader::initShader(const wchar_t* vsFilename, const wchar_t
 	// Create a texture sampler state description for the 3D Perlin-Worley noise texture.
 	D3D11_SAMPLER_DESC noiseSamplerDesc;
 	noiseSamplerDesc.Filter = D3D11_FILTER_ANISOTROPIC;
-	noiseSamplerDesc.AddressU = D3D11_TEXTURE_ADDRESS_CLAMP;
-	noiseSamplerDesc.AddressV = D3D11_TEXTURE_ADDRESS_CLAMP;
-	noiseSamplerDesc.AddressW = D3D11_TEXTURE_ADDRESS_CLAMP;
+	noiseSamplerDesc.AddressU = D3D11_TEXTURE_ADDRESS_WRAP;
+	noiseSamplerDesc.AddressV = D3D11_TEXTURE_ADDRESS_WRAP;
+	noiseSamplerDesc.AddressW = D3D11_TEXTURE_ADDRESS_WRAP;
 	noiseSamplerDesc.MipLODBias = 0.0f;
 	noiseSamplerDesc.MaxAnisotropy = 1;
 	noiseSamplerDesc.ComparisonFunc = D3D11_COMPARISON_ALWAYS;
@@ -112,7 +119,7 @@ void VolumetricCloudsShader::initShader(const wchar_t* vsFilename, const wchar_t
 	boundingBoxBufferDesc.StructureByteStride = 0;
 	renderer->CreateBuffer(&boundingBoxBufferDesc, NULL, &boundingBoxBuffer);
 
-	// Setup camera buffer (for vertex shader)
+	// Setup camera buffer (for pixel shader)
 	D3D11_BUFFER_DESC cameraBufferDesc;
 	cameraBufferDesc.Usage = D3D11_USAGE_DYNAMIC;
 	cameraBufferDesc.ByteWidth = sizeof(CameraBufferType);
@@ -122,9 +129,29 @@ void VolumetricCloudsShader::initShader(const wchar_t* vsFilename, const wchar_t
 	cameraBufferDesc.StructureByteStride = 0;
 	renderer->CreateBuffer(&cameraBufferDesc, NULL, &cameraBuffer);
 
+	// Setup inverse matrix buffer (for pixel shader)
+	D3D11_BUFFER_DESC inverseMatrixBufferDesc;
+	inverseMatrixBufferDesc.Usage = D3D11_USAGE_DYNAMIC;
+	inverseMatrixBufferDesc.ByteWidth = sizeof(InverseMatrixBufferType);
+	inverseMatrixBufferDesc.BindFlags = D3D11_BIND_CONSTANT_BUFFER;
+	inverseMatrixBufferDesc.CPUAccessFlags = D3D11_CPU_ACCESS_WRITE;
+	inverseMatrixBufferDesc.MiscFlags = 0;
+	inverseMatrixBufferDesc.StructureByteStride = 0;
+	renderer->CreateBuffer(&inverseMatrixBufferDesc, NULL, &inverseMatrixBuffer);
+
+	// Setup cloud buffer (for pixel shader)
+	D3D11_BUFFER_DESC cloudBufferDesc;
+	cloudBufferDesc.Usage = D3D11_USAGE_DYNAMIC;
+	cloudBufferDesc.ByteWidth = sizeof(CloudBufferType);
+	cloudBufferDesc.BindFlags = D3D11_BIND_CONSTANT_BUFFER;
+	cloudBufferDesc.CPUAccessFlags = D3D11_CPU_ACCESS_WRITE;
+	cloudBufferDesc.MiscFlags = 0;
+	cloudBufferDesc.StructureByteStride = 0;
+	renderer->CreateBuffer(&cloudBufferDesc, NULL, &cloudBuffer);
+
 }
 
-void VolumetricCloudsShader::setShaderParameters(ID3D11DeviceContext* deviceContext, const XMMATRIX& worldMatrix, const XMMATRIX& viewMatrix, const XMMATRIX& projectionMatrix, XMFLOAT3 minBounds, XMFLOAT3 maxBounds, ID3D11ShaderResourceView* shapeNoiseTexture, XMFLOAT3 cameraPos, ShadowMap* cameraDepthMap)
+void VolumetricCloudsShader::setShaderParameters(ID3D11DeviceContext* deviceContext, const XMMATRIX& worldMatrix, const XMMATRIX& viewMatrix, const XMMATRIX& projectionMatrix, XMFLOAT3 minBounds, XMFLOAT3 maxBounds, ID3D11ShaderResourceView* shapeNoiseTexture, XMFLOAT3 cameraPos, ShadowMap* cameraDepthMap, CloudData cloudData)
 {
 	HRESULT result;
 	D3D11_MAPPED_SUBRESOURCE mappedResource;
@@ -155,14 +182,38 @@ void VolumetricCloudsShader::setShaderParameters(ID3D11DeviceContext* deviceCont
 		deviceContext->VSSetConstantBuffers(1, 1, &boundingBoxBuffer);
 	}
 
-	// Send camera data to vertex shader
+	// Send camera data to pixel shader
 	{
 		result = deviceContext->Map(cameraBuffer, 0, D3D11_MAP_WRITE_DISCARD, 0, &mappedResource);
 		CameraBufferType* cameraPtr = (CameraBufferType*)mappedResource.pData;
 		cameraPtr->cameraPosition = cameraPos;
 		cameraPtr->padding = 0.0f;
 		deviceContext->Unmap(cameraBuffer, 0);
-		deviceContext->VSSetConstantBuffers(2, 1, &cameraBuffer);
+		deviceContext->PSSetConstantBuffers(0, 1, &cameraBuffer);
+	}
+
+	// Send inverse matrix data to pixel shader
+	{
+		// Passing in the inverse of the projection matrix so we can calculate a linear depth value in the ps.
+		result = deviceContext->Map(inverseMatrixBuffer, 0, D3D11_MAP_WRITE_DISCARD, 0, &mappedResource);
+		InverseMatrixBufferType* invMatrixPtr = (InverseMatrixBufferType*)mappedResource.pData;
+		invMatrixPtr->invProjection = XMMatrixInverse(NULL, projectionMatrix);
+		deviceContext->Unmap(inverseMatrixBuffer, 0);
+		deviceContext->PSSetConstantBuffers(1, 1, &inverseMatrixBuffer);
+	}
+
+	// Send cloud data to pixel shader
+	{
+		result = deviceContext->Map(cloudBuffer, 0, D3D11_MAP_WRITE_DISCARD, 0, &mappedResource);
+		CloudBufferType* cloudBufferData = (CloudBufferType*)mappedResource.pData;
+		cloudBufferData->cloudOffset = cloudData.cloudOffset;
+		cloudBufferData->cloudScale = cloudData.cloudScale;
+		cloudBufferData->densityThreshold = cloudData.densityThreshold;
+		cloudBufferData->densityMultiplier = cloudData.densityMultiplier;
+		cloudBufferData->numSteps = cloudData.numSteps;
+		cloudBufferData->padding = 0.f;
+		deviceContext->Unmap(cloudBuffer, 0);
+		deviceContext->PSSetConstantBuffers(2, 1, &cloudBuffer);
 	}
 
 	ID3D11ShaderResourceView* cameraDepthTexture = cameraDepthMap->getDepthMapSRV();

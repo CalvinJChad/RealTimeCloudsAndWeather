@@ -5,14 +5,30 @@
 // Code from Sebastian Lague's 'Coding Adventure: Clouds' https://github.com/SebLague/Clouds
 // =====================================================================================
 
-//// Buffer for bounding box volume attributes.
-//cbuffer BoundingBoxVolumeBuffer : register(b0)
-//{
-//    float3 boundsMin;
-//    float padding0;
-//    float3 boundsMax;
-//    float padding1;
-//};
+//#define DEBUG_DEPTH
+
+cbuffer CameraBuffer : register(b0)
+{
+    float3 cameraPosition;  // The position of the camera in world space.
+    float cameraPadding;
+};
+
+// Need the inverse of the projection matrix used in the camera depth pass
+// to calculate the linear depth value.
+cbuffer InverseMatrixBuffer : register(b1)
+{
+    matrix invProjectionMatrix;
+};
+
+cbuffer CloudBuffer : register(b2)
+{
+    float3 cloudOffset;
+    float cloudScale;
+    float densityThreshold;
+    float densityMultiplier;
+    int numSteps;
+    float padding;
+}
 
 // Texture and sampler registers
 //Texture2D mainTexture : register(t0);
@@ -22,31 +38,38 @@ SamplerState depthSampler : register(s0);
 Texture3D shapeNoiseTexture : register(t1);
 SamplerState shapeNoiseSampler : register(s1);
 
-// Variables that I need to a buffer at some point (ImGui values)
-const float3 cloudOffset;
-const float cloudScale;
-const float densityThreshold;
-const float densityMultiplier;
-const int numSteps = 1;
-
 struct InputType
 {
     float4 position : SV_POSITION;
     float2 tex : TEXCOORD0;
-    float3 worldPosition : TEXCOORD1; // Position of the vertex in world space
-    float3 cameraWorldPosition : TEXCOORD2; // The position of the camera in world space
-    float3 viewVector : TEXCOORD3; // The view vector of the camera
-    float3 boundMinWorldPosition : TEXCOORD4; // Position of the minimum bounds of the bounding box volume in world space
-    float3 boundMaxWorldPosition : TEXCOORD5; // Position of the maximum bounds of the bounding box volume in world space
+    float3 worldPosition : TEXCOORD1;           // Position of the vertex in world space
+    float3 boundMinWorldPosition : TEXCOORD2;   // Position of the minimum bounds of the bounding box volume in world space
+    float3 boundMaxWorldPosition : TEXCOORD3;   // Position of the maximum bounds of the bounding box volume in world space
 };
 
-float2 getProjectiveCoords(float4 position)
+float2 getUVCoords(float2 pixelScreenPosition)
 {
-    // Calculate the projected texture coordinates.
-    float2 projTex = position.xy / position.w;
-    projTex *= float2(0.5, -0.5);
-    projTex += float2(0.5f, 0.5f);
-    return projTex;
+    // Get the dimensions of the Depth Texture.
+    uint dWidth, dHeight;
+    cameraDepthTexture.GetDimensions(dWidth, dHeight);
+    
+    float2 uvDepthPos = pixelScreenPosition / float2(dWidth, dHeight);
+    return uvDepthPos;
+}
+
+// Depth value stored in camera depth texture is nonlinear (in the range [0, 1]).
+// To get the linear depth value, we can multiply the native device coordinates (ndc) by the inverse of the projection matrix
+// used in the depth pass (should be the same one used in this shader's vs) to linearize the value (get Z value in world space).
+// Code from Pascal Rosenkranz's 'prkz.de blog' https://prkz.de/blog/6-linearizing-depth-buffer-samples-in-hlsl
+float getLinearDepthValue(float nonLinearDepthValue)
+{
+    // We are only interested in the depth here
+    float4 ndcCoords = float4(0, 0, nonLinearDepthValue, 1.0f);
+    // Unproject the vector into (homogenous) view-space vector
+    float4 viewCoords = mul(invProjectionMatrix, ndcCoords);
+    // Divide by w, which results in actual view-space z value
+    float linearDepth = viewCoords.z / viewCoords.w;
+    return linearDepth;
 }
 
 // Returns (dstToBox, dstInsideBox). If ray misses box, dstInsideBox will be zero
@@ -58,13 +81,8 @@ float2 rayBoxDst(float3 boundsMin, float3 boundsMax, float3 rayOrigin, float3 in
     float3 tmin = min(t0, t1);
     float3 tmax = max(t0, t1);
                 
-    //float dstA = max(max(tmin.x, tmin.y), tmin.z);
-    //float dstB = min(tmax.x, min(tmax.y, tmax.z));
-    
-    // Suggested algorithm doesn't seem to work for calculating dstToBox/dstInsideBox.
-    // This algorithm is much less efficient (sqrt function is expensive). But for now it works.
-    float dstA = sqrt((tmin.x * tmin.x) + (tmin.y * tmin.y) + (tmin.z * tmin.z));
-    float dstB = sqrt((tmax.x * tmax.x) + (tmax.y * tmax.y) + (tmax.z * tmax.z));
+    float dstA = max(max(tmin.x, tmin.y), tmin.z);
+    float dstB = min(tmax.x, min(tmax.y, tmax.z));
 
     // CASE 1: ray intersects box from outside (0 <= dstA <= dstB)
     // dstA is dst to nearest intersection, dstB dst to far intersection
@@ -73,9 +91,6 @@ float2 rayBoxDst(float3 boundsMin, float3 boundsMax, float3 rayOrigin, float3 in
     // dstA is the dst to intersection behind the ray, dstB is dst to forward intersection
 
     // CASE 3: ray misses box (dstA > dstB)
-
-    //float dstToBox = max(0, dstA);
-    //float dstInsideBox = max(0, dstB - dstToBox);
     
     float dstToBox = max(0, dstA);
     float dstInsideBox = max(0, dstB - dstToBox);
@@ -86,38 +101,56 @@ float2 rayBoxDst(float3 boundsMin, float3 boundsMax, float3 rayOrigin, float3 in
 float sampleDensity(float3 position)
 {
     float3 uvw = position * cloudScale * 0.001f + cloudOffset * 0.01f;
-    float4 shape = shapeNoiseTexture.Sample(shapeNoiseSampler, uvw);
+    float4 shape = shapeNoiseTexture.Sample(shapeNoiseSampler, uvw, 0);
     float density = max(0, shape.r - densityThreshold) * densityMultiplier;
     return density;
 }
 
 float4 main(InputType input) : SV_TARGET
 {
-    // Get the dimensions of the Output Texture.
-    uint tWidth, tHeight, tDepth;
-    shapeNoiseTexture.GetDimensions(tWidth, tHeight, tDepth);
+    // Get the dimensions of the Noise Texture.
+    uint nWidth, nHeight, nDepth;
+    shapeNoiseTexture.GetDimensions(nWidth, nHeight, nDepth);
+
+    // Get nonlinear depth value from depth map.
+    float2 uvDepthPos = getUVCoords(input.position.xy);
+    float nonLinearDepthValue = cameraDepthTexture.Sample(depthSampler, uvDepthPos).r;
+    float depthValue = getLinearDepthValue(nonLinearDepthValue);
     
-    float2 uvDepthPos = getProjectiveCoords(input.position);
-    //float depthValue = cameraDepthTexture.Sample(depthSampler, uvDepthPos).r;
-    float depthValue = cameraDepthTexture.Sample(depthSampler, input.tex).r;
+#ifdef DEBUG_DEPTH
+    return float4(depthValue, depthValue, depthValue, 1.0f);
+#endif
     
-    float3 rayOrigin = input.cameraWorldPosition;
-    float3 rayDirection = input.viewVector;
+    float3 rayOrigin = cameraPosition;
+    float3 rayDirection = normalize(input.worldPosition - rayOrigin);
     
-    float2 rayBoxInfo = rayBoxDst(input.boundMinWorldPosition, input.boundMaxWorldPosition, rayOrigin, rayDirection);
+    float2 rayBoxInfo = rayBoxDst(input.boundMinWorldPosition, input.boundMaxWorldPosition, rayOrigin, (1.0f / rayDirection));
     float dstToBox = rayBoxInfo.x;
     float dstInBox = rayBoxInfo.y;
     
+    // Get point of intersection with the cloud volume.
+    float3 entryPoint = rayOrigin + rayDirection * dstToBox;
+    
     float dstTravelled = 0.f;
     float stepSize = dstInBox / numSteps;
-    //float dstLimit = min()
+    float dstLimit = min(depthValue - dstToBox, dstInBox);
     
-    bool rayHitBox = dstInBox > 0.f/* && dstToBox < depthValue*/;
-    if (rayHitBox)
+    // March through volume
+    float totalDensity = 0.f;
+    [unroll(200)]   // Need to specify a max number of times we can step through the cloud volume.
+    for (uint i = 0; i < numSteps; i++)
     {
-        return float4(0.0f, 0.0f, 0.0f, 1.0f);
+        if (dstTravelled >= dstLimit)
+            break;  // Early exit
+        
+        float3 rayPos = entryPoint + rayDirection * dstTravelled;
+
+        totalDensity += sampleDensity(rayPos);
+
+        dstTravelled += stepSize;
     }
+    float transmittance = exp(-totalDensity);
     
-    return float4(1.0f, 1.0f, 1.0f, 1.0f);
+    return float4(1.0f, 1.0f, 1.0f, 1.0f) * transmittance;
 
 }

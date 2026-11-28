@@ -16,6 +16,15 @@
 
 using namespace std;
 
+struct CloudData
+{
+	XMFLOAT3 cloudOffset;
+	float cloudScale;
+	float densityThreshold;
+	float densityMultiplier;
+	int numSteps;
+};
+
 class App1 : public BaseApplication
 {
 public:
@@ -87,6 +96,8 @@ private:
 	XMFLOAT3 renderVolumePosition = XMFLOAT3(0.f, 10.f, 30.f);
 	XMFLOAT3 renderVolumeRotation = XMFLOAT3(0.f, 0.f, 0.f);
 	XMFLOAT3 renderVolumeExtent = XMFLOAT3(10.0f, 10.0f, 10.0f);
+	/* Cloud data values */
+	CloudData cloudData;
 };
 
 static const XMINT3 Num_Threads_Per_Group = XMINT3(8, 8, 8);	// Make sure this is up-to-date with cs number of threads defenition.
